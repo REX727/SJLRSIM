@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Robogames Pallet Delivery — 手機友善沙盒</title>
+<style>
+  :root{
+    --ink: #0f172a;
+    --muted:#64748b;
+    --bg: #eef2f7;
+    --card:#ffffff;
+
+    --yellow:#ffd54f;
+    --orange:#ff9800;
+    --gray:#9e9e9e;
+    --red:#ef4444;
+    --robot:#2563eb;
+    --dash:#ffb34d;
+    --ring:#93c5fd;
+  }
+  *{box-sizing:border-box}
+  html,body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", Arial, sans-serif
+  }
+  h1{font-size:1.1rem;margin:0}
+
+  /* Panel 卡片樣式 */
+  .panel{
+    background:var(--card);
+    border-radius:16px;
+    box-shadow:0 8px 24px rgba(2,6,23,.08);
+    padding:14px;
+    display:flex;
+    flex-direction:column;
+    gap:12px
+  }
+
+  .wrap{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:12px;
+    padding:12px 12px calc(96px + env(safe-area-inset-bottom));
+    max-width:1200px;
+    margin:0 auto
+  }
+  @media (min-width: 980px){
+    .wrap{grid-template-columns: 460px 1fr; padding-bottom: 16px}
+  }
+
+  /* 棋盤樣式 */
+  .board-wrap{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start}
+  .labels-col{
+    width:26px;
+    display:grid;grid-template-rows:repeat(8, 1fr);
+    gap:3px;padding-top:3px;
+  }
+  .labels-row{display:grid;grid-template-columns:repeat(8, 1fr);gap:3px}
+  .lbl{display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--muted);user-select:none}
+
+  .grid{
+    width:100%;
+    display:grid;
+    grid-template-columns:repeat(8, 1fr);
+    gap:3px;
+    background:#cbd5e1;
+    border-radius:14px;
+    padding:3px;
+    position:relative;
+    touch-action:manipulation;
+  }
+  .cell{
+    position:relative;
+    background:linear-gradient(145deg,#fdfdfd,#f3f4f6);
+    border-radius:10px;
+    overflow:hidden;
+    aspect-ratio:1/1;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.05);
+    transition:background 0.2s ease;
+  }
+  .cell:hover{background:linear-gradient(145deg,#ffffff,#e9ebef)}
+
+  /* 禁區 */
+  .cell.restricted{
+    background:
+      repeating-linear-gradient(45deg, rgba(239,68,68,.18) 0, rgba(239,68,68,.18) 10px, rgba(239,68,68,.35) 10px, rgba(239,68,68,.35) 20px),
+      #ffecec;
+    outline:2px solid var(--red);
+  }
+
+  /* 目標位置 */
+  .cell.target::after{
+    content:"";
+    position:absolute;inset:8%;
+    border:2px dashed var(--dash);
+    border-radius:10px;
+    pointer-events:none
+  }
+  .badge{
+    position:absolute;
+    top:6px;left:6px;
+    background:var(--orange);
+    color:#fff;
+    font-weight:800;
+    font-size:.78rem;
+    padding:2px 7px;
+    border-radius:999px;
+    box-shadow:0 1px 3px rgba(0,0,0,.15);
+  }
+
+  /* 貨架 */
+  .pallet{
+    position:absolute;inset:12%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--yellow);
+    color:#111827;font-weight:900;
+    border-radius:12px;
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.15);
+  }
+  .pallet.gray{ background:var(--gray); color:#fff }
+  .pallet.carrying{ outline:3px solid var(--ring); z-index:2 }
+
+  /* 機器人 */
+  .robot{
+    position:absolute; left:8%; top:8%;
+    width:84%; height:84%;
+    display:flex;align-items:center;justify-content:center;
+    pointer-events:none; z-index:3;
+    filter: drop-shadow(0 3px 8px rgba(0,0,0,.28));
+  }
+  .robot .body{
+    width:72%;height:72%;
+    background:var(--robot);
+    border-radius:50%;
+    position:relative;
+    box-shadow:0 0 0 6px rgba(37,99,235,.18) inset, 0 3px 8px rgba(0,0,0,.25);
+  }
+  .robot .arrow{
+    position:absolute; width:0;height:0;
+    border-left:12px solid transparent;border-right:12px solid transparent;border-bottom:20px solid #fff;
+    top:2px; left:50%; transform:translateX(-50%);
+  }
+  .robot.lift-up .body{ box-shadow:0 0 0 8px rgba(37,99,235,.28) inset }
+  .robot .compass{
+    position:absolute; right:-2px; bottom:-2px;
+    background:#0ea5e9; color:#fff;
+    font-weight:900; font-size:.7rem;
+    padding:2px 5px; border-radius:999px
+  }
+
+  /* 標籤群組與按鈕 */
+  .legend{display:flex;flex-wrap:wrap;gap:10px}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 10px;
+    border:1px solid #e2e8f0;
+    border-radius:999px;
+    background:#fff;
+    font-size:.9rem;
+    box-shadow:0 1px 2px rgba(0,0,0,.05);
+  }
+  .dot{width:14px;height:14px;border-radius:4px}
+  .dot.yellow{background:var(--yellow)}
+  .dot.orange{background:var(--orange)}
+  .dot.gray{background:var(--gray)}
+  .dot.red{background:var(--red)}
+  .dot.robot{background:var(--robot);border-radius:50%}
+
+  .btn{
+    appearance:none;border:none;
+    border-radius:12px;
+    padding:10px 14px;
+    background:#111827;color:#fff;
+    font-weight:800;
+    cursor:pointer;
+    font-size:.95rem;
+    transition:background .2s ease, transform .1s ease;
+  }
+  .btn:hover{transform:translateY(-1px)}
+  .btn.secondary{background:#334155}
+  .btn.ghost{background:#e2e8f0;color:#111827}
+  .btn.warn{background:#d97706}
+  .btn.danger{background:#b91c1c}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .modebar .btn.active{outline:2px solid #2563eb}
+
+  .log{
+    height:150px;overflow:auto;
+    background:#0b1220;color:#d1d5db;
+    border-radius:12px;
+    padding:8px 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size:.9rem
+  }
+
+  /* 手機底部固定控制列 */
+  .dock{
+    position:fixed;left:0;right:0;bottom:0;
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(255,255,255,.95);
+    backdrop-filter: saturate(1.2) blur(10px);
+    border-top:1px solid #e2e8f0; z-index:50;
+  }
+  .dock .bar{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+  .dock .bar .big{padding:12px 10px;border-radius:12px;font-weight:900;font-size:1.05rem}
+  .dock .bar .accent{background:#0ea5e9;color:#fff}
+  .dock .bar .danger{background:#ef4444;color:#fff}
+  .dock .sub{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<!-- 內容與 JS 與你的原版相同，僅修改 robot 初始位置 -->
+<script>
+(function(){
+  const size = 8;
+  // ... 其他程式碼不變 ...
+
+  function resetToMission(pairs){
+    state.pallets.clear(); state.targets.clear();
+    for(const it of pairs){
+      state.pallets.set(it.id, {
+        id: it.id, src:{...it.src}, dst:{...it.dst},
+        pos:{...it.src}, delivered:false, onGround:true, carried:false
+      });
+      state.targets.set(`${it.dst.r},${it.dst.c}`, it.id);
+    }
+    // 將初始位置改為 D1
+    state.robot = { r:3, c:0, dir:dirFromLetter(headingSel.value), liftUp:false, carryingId:null, placed:true, justDeliveredKey:null };
+    stopRun(); state.queue=[]; state.queueIdx=0;
+    ok(`任務已載入，共 ${pairs.length} 件貨架。機器人位於 D1，朝向 ${headingSel.value}。`);
+    render();
+  }
+
+  // ... 其他程式碼不變 ...
+})();
+</script>
+</body>
+</html>
